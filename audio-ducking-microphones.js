@@ -60,27 +60,27 @@ const config = {
 
   // Mics that are monitored for VU meter trigger levels
   // Example types: Microphone | Ethernet | USBMicrophone
+  // Check inputs availble to set ConnectorId and|or SubId
+  // Example types: SubId: 1-9
   mics: [
-    { ConnectorType: 'Microphone', ConnectorId: 1 },
-    { ConnectorType: 'Microphone', ConnectorId: 2 },
-    { ConnectorType: 'Microphone', ConnectorId: 3 }
+	{ ConnectorType: 'Microphone', ConnectorId: 1},
+	{ ConnectorType: 'Microphone', ConnectorId: 2, SubId: 1}
   ],
 
   // Mics that are ducked/unducked (controlled)
   duck: [
-    { ConnectorType: 'Microphone', ConnectorId: 1 },
-    { ConnectorType: 'Microphone', ConnectorId: 2 },
-    { ConnectorType: 'Microphone', ConnectorId: 3 }
+	{ ConnectorType: 'Microphone', ConnectorId: 3},
+	{ ConnectorType: 'Microphone', ConnectorId: 4, SubId: 2}
   ],
 
   // Thresholds in which the monitored mic is considered high or low
-  threshold: { high: 20, low: 5 },
+  threshold: { high: 30, low: 10 },
 
   // Gain/Levels which should be set ducked or unducked
-  levels: { duck: 0, unduck: 60 },
+  levels: { duck: 0, unduck: 20 },
 
   // Duration where the monitored mic is low before unducking
-  unduck: { timeout: 0 },
+  unduck: { timeout: 2 },
 
   // Samples taken every 100ms, 4 samples at 100ms = 400ms
   samples: 4,
@@ -128,7 +128,7 @@ async function init() {
   await applyNoiseRemovalConfig();
   await createPanel();
 
-  xapi.Event.UserInterface.Extensions.Widget.Action.on(processActions);
+  await xapi.Event.UserInterface.Extensions.Widget.Action.on(processActions);
 
   // RoomOS call state
   xapi.Status.Call.on(({ ghost, Status, id }) => {
@@ -290,7 +290,7 @@ async function setGroupState(groupName, micList, micLevel /* 'duck' | 'unduck' *
   const level = config.levels[micLevel];
 
   if (config.debug) {
-    console.log(`Setting ${groupName} -> ${micLevel} (${gainLevel}=${level}) on: ${micList.map(micKey).join(', ')}`);
+    console.log(`Setting ${groupName} -> on: ${micList.map(micKey).join(', ')} -> ${micLevel} (${gainLevel}=${level})`);
   }
 
   await Promise.all(micList.map(m => setInputLevelGain({ ...m, level })));
@@ -455,7 +455,13 @@ async function checkGainLevel() {
 
 async function setInputLevelGain({ ConnectorType, ConnectorId, SubId, level }) {
   const supportedTypes = ['Ethernet', 'Microphone', 'USBInterface', 'USBMicrophone'];
-  if (!supportedTypes.includes(ConnectorType)) throw new Error(`Unsupported Audio Input Type [${ConnectorType}]`);
+  if (!supportedTypes.includes(ConnectorType)) {
+    throw new Error(`Unsupported Audio Input Type [${ConnectorType}]`);
+  }
+
+  // Build the exact path we are about to use (for debugging)
+  const base = `Audio.Input.${ConnectorType}[${ConnectorId}]`;
+  const path = SubId? `${base}.Channel[${SubId}].${gainLevel}`: `${base}.${gainLevel}`;
 
   try {
     if (SubId) {
@@ -464,13 +470,9 @@ async function setInputLevelGain({ ConnectorType, ConnectorId, SubId, level }) {
       await xapi.Config.Audio.Input[ConnectorType][ConnectorId][gainLevel].set(level);
     }
 
-    if (config.debug) {
-      const mic = `${ConnectorType}.${ConnectorId}${SubId ? '.' + SubId : ''}`;
-      console.log(`Mic: ${mic} - ${gainLevel}: ${level}`);
-    }
+    if (config.debug) console.log(`Set ${path} = ${level}`);
   } catch (e) {
-    // Swallow errors for devices/modes where some connectors are absent
-    if (config.debug) console.warn('Failed to set input level/gain:', e?.message ?? e);
+    throw new Error(`Failed to set ${path} to ${level}, The xAPI Path is not found:`, e?.message ?? e);
   }
 }
 
