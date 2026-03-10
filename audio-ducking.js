@@ -10,7 +10,7 @@
  *
  * This forked version keeps the upstream improvements and includes
  * enhancements to "audio-ducking.js":
- * Version 0-0-1 (Released:10/03/26)
+ * Version 1-0-0 (Released:10/03/26)
  *   - Optionally run VU monitoring in and out-of-call
  *   - Optional standby stop/restart
  *   - Added audienceOnly mode
