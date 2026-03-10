@@ -8,8 +8,8 @@
  *       are muted externally (no VU meter events) so unducking can still occur.
  *     - MTR call state support.
  *
- * This forked version keeps the upstream improvements and includes local
- * enhancements from "audio-ducking of microphones.js":
+ * This forked version keeps the upstream improvements and includes
+ * enhancements to "audio-ducking.js":
  * Version 0-0-1 (Released:10/03/26)
  *   - Optionally run VU monitoring in and out-of-call
  *   - Optional standby stop/restart
