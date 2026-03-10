@@ -112,6 +112,7 @@ let micLevelAverages;
 let audioEventCount = 0;
 let mode;
 let callId;
+let teamsAvailable = false;
 
 // Default VU meter source
 let vuMeterSource = 'BeforeAEC';
@@ -128,6 +129,7 @@ async function init() {
   gainLevel = await checkGainLevel();
   applyVuMeterConfig();
   await applyNoiseRemovalConfig();
+  await detectTeams();
   await createPanel();
 
   await xapi.Event.UserInterface.Extensions.Widget.Action.on(processActions);
@@ -142,11 +144,15 @@ async function init() {
     if (ghost) processCallEnd('RoomOS');
   });
 
-  // MTR call state
+// MTR call state (only if MicrosoftTeams xAPI exists)
+if (teamsAvailable) {
   xapi.Status.MicrosoftTeams.Calling.InCall.on((inMTRCall) => {
     if (inMTRCall === 'True') processNewCall('MTR');
     else processCallEnd('MTR');
   });
+} else if (config.debug) {
+  console.log('Skipping MTR call-state listener (Teams not available).');
+}
 
   // Standby handling
   if (config.stopInStandby) {
@@ -185,19 +191,6 @@ function applyVuMeterConfig() {
     console.warn(`Invalid vuMeter.source="${desired}". Falling back to "BeforeAEC".`);
   }
   if (config.debug) console.log(`VU meter Source=${vuMeterSource}, IntervalMs=${sampleInterval}`);
-}
-
-async function applyNoiseRemovalConfig() {
-  const allowedModes = ['Disabled', 'Enabled', 'Manual'];
-  const desired = config.noiseRemoval?.mode ?? 'Enabled';
-  const modeToApply = allowedModes.includes(desired) ? desired : 'Enabled';
-
-  try {
-    await xapi.Config.Audio.Microphones.NoiseRemoval.Mode.set(modeToApply);
-    if (config.debug) console.log(`NoiseRemoval.Mode set to: ${modeToApply}`);
-  } catch (e) {
-    if (config.debug) console.warn('Noise removal could not be set (may be unsupported):', e?.message ?? e);
-  }
 }
 
 async function applyMode() {
@@ -245,7 +238,16 @@ function processActions({ Type, Value, WidgetId }) {
 }
 
 async function checkInCall() {
-  const mtrCall = await xapi.Status.MicrosoftTeams.Calling.InCall.get();
+ // Only query Teams call status when Teams is available
+  let mtrCall = 'False';
+  if (teamsAvailable) {
+    try {
+      mtrCall = await xapi.Status.MicrosoftTeams.Calling.InCall.get();
+    } catch (e) {
+      mtrCall = 'False';
+      if (config.debug) console.warn('Teams InCall.get failed:', e?.message ?? e);
+    }
+  }
   const call = await xapi.Status.Call.get();
   return (call?.[0]?.Status === 'Connected') || (mtrCall === 'True');
 }
@@ -301,8 +303,8 @@ async function setGroupState(groupName, micList, micLevel /* 'duck' | 'unduck' *
 
 // Group: 'monitored' | 'controlled'
 async function setMicsLevel(group, micLevel, force = false) {
-  if (group === 'monitored') return setGroupState('monitoredMics', config.mics, micLevel, force);
-  if (group === 'controlled') return setGroupState('controlledMics', config.duck, micLevel, force);
+  if (group === 'monitored') return setGroupState('monitoredMics', config.mics, micLevel, false);
+  if (group === 'controlled') return setGroupState('controlledMics', config.duck, micLevel, false);
   throw new Error(`Invalid group "${group}". Use "monitored" or "controlled".`);
 }
 
@@ -461,7 +463,7 @@ async function setInputLevelGain({ ConnectorType, ConnectorId, SubId, level }) {
     throw new Error(`Unsupported Audio Input Type [${ConnectorType}]`);
   }
 
-  // Build the exact path we are about to use (for debugging)
+  // Build the exact path to use (for debugging)
   const base = `Audio.Input.${ConnectorType}[${ConnectorId}]`;
   const path = SubId? `${base}.Channel[${SubId}].${gainLevel}`: `${base}.${gainLevel}`;
 
@@ -471,7 +473,6 @@ async function setInputLevelGain({ ConnectorType, ConnectorId, SubId, level }) {
     } else {
       await xapi.Config.Audio.Input[ConnectorType][ConnectorId][gainLevel].set(level);
     }
-
     if (config.debug) console.log(`Set ${path} = ${level}`);
   } catch (e) {
     throw new Error(`Failed to set ${path} to ${level}, The xAPI Path is not found:`, e?.message ?? e);
@@ -480,16 +481,12 @@ async function setInputLevelGain({ ConnectorType, ConnectorId, SubId, level }) {
 
 function flattenObject(obj) {
   let result = {};
-
   for (const i in obj) {
     if (!Object.prototype.hasOwnProperty.call(obj, i)) continue;
-
     if (typeof obj[i] === 'object' && obj[i] !== null) {
       const flatObject = flattenObject(obj[i]);
-
       for (const x in flatObject) {
         if (!Object.prototype.hasOwnProperty.call(flatObject, x)) continue;
-
         const id = obj[i]?.id ?? i;
         const key = (x === 'VuMeter') ? id : ((i === 'SubId') ? x : id + '.' + x);
         result[key] = flatObject[x];
@@ -499,7 +496,6 @@ function flattenObject(obj) {
       result[i] = parseInt(obj[i], 10);
     }
   }
-
   return result;
 }
 
@@ -521,11 +517,8 @@ async function createPanel() {
     .join('');
 
   // If MTR is installed, panel is forced into ControlPanel unless Hidden
-  const mtrDevice = await xapi.Command.MicrosoftTeams.List({ Show: 'Installed' })
-    .then(() => true)
-    .catch(() => false);
+  const panelLocation = teamsAvailable ? (location === 'Hidden' ? location : 'ControlPanel') : location;
 
-  const panelLocation = mtrDevice ? (location === 'Hidden' ? location : 'ControlPanel') : location;
 
   const panel = `
 <Extensions>
@@ -636,4 +629,31 @@ function formatMicStatsForLog(averagesObj, rawLevelsObj) {
   }
 
   return lines.join('\n');
+}
+
+/**************************************************************
+ * xAPI Call helpers
+ **************************************************************/
+async function detectTeams() {
+  try {
+    // If the MicrosoftTeams command tree exists, this will succeed.
+    await xapi.Command.MicrosoftTeams.List({ Show: 'Installed' });
+    teamsAvailable = true;
+  } catch (e) {
+    teamsAvailable = false;
+    if (config.debug) console.warn('MicrosoftTeams xAPI not available on this device.');
+  }
+}
+
+async function applyNoiseRemovalConfig() {
+  const allowedModes = ['Disabled', 'Enabled', 'Manual'];
+  const desired = config.noiseRemoval?.mode ?? 'Enabled';
+  const modeToApply = allowedModes.includes(desired) ? desired : 'Enabled';
+
+  try {
+    await xapi.Config.Audio.Microphones.NoiseRemoval.Mode.set(modeToApply);
+    if (config.debug) console.log(`NoiseRemoval.Mode set to: ${modeToApply}`);
+  } catch (e) {
+    if (config.debug) console.warn('Noise removal could not be set (may be unsupported):', e?.message ?? e);
+  }
 }
