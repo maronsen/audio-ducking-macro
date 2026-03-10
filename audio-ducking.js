@@ -1,5 +1,5 @@
 /**************************************************************
- * Audio Ducking Macro (Merged)
+ * Audio Ducking Macro
  *
  * Base macro:
  *   - Audio Ducking Macro by William Mills (Cisco)
@@ -17,6 +17,7 @@
  *   - Added configurable VU meter source (BeforeAEC/AfterAEC)
  *   - Optional NoiseRemoval.Mode config
  *   - Consolidated mic control with state caching to reduce repeated writes
+ *   - added min, max, avarage, avgMin, avgMax microphone gain information to the log output during debug and finetuning.
  **************************************************************/
 
 import xapi from 'xapi';
