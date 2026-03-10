@@ -34,6 +34,7 @@ const config = {
 
   showAlerts: true, // true = show alert messages on controller
 
+ // Customise the macros mode names
   modeNames: {
     autoDuck: 'Auto Adjust Audience',
     presentersOnly: 'Only Presenters',
@@ -41,6 +42,7 @@ const config = {
     presentersAndAudience: 'Presenters & Audience'
   },
 
+  // Specify the default mode
   defaultMode: 'autoDuck',
 
   // Only run macro when device is in a call
@@ -52,22 +54,21 @@ const config = {
   // Stop monitoring in standby and restart on wake
   stopInStandby: false,
 
-  // VU meter tap point (before/after echo cancellation)
+  // Specify monitoring before or after audio processing (before/after echo cancellation)
   vuMeter: { source: 'BeforeAEC' }, // BeforeAEC | AfterAEC
 
   // Noise reduction / background noise removal
   noiseRemoval: { mode: 'Enabled' }, // Disabled | Enabled | Manual
 
-  // Mics that are monitored for VU meter trigger levels
+  // Specify which mics should be monitored
   // Example types: Microphone | Ethernet | USBMicrophone
   // Check inputs availble to set ConnectorId and|or SubId
-  // Example types: SubId: 1-9
   mics: [
 	{ ConnectorType: 'Microphone', ConnectorId: 1},
 	{ ConnectorType: 'Microphone', ConnectorId: 2, SubId: 1}
   ],
 
-  // Mics that are ducked/unducked (controlled)
+  // Specify which mics should be ducked or unducked (controlled)
   duck: [
 	{ ConnectorType: 'Microphone', ConnectorId: 3},
 	{ ConnectorType: 'Microphone', ConnectorId: 4, SubId: 2}
