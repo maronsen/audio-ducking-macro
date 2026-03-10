@@ -35,10 +35,10 @@ const config = {
   showAlerts: true, // true = show alert messages on controller
 
   modeNames: {
-    autoDuck: 'Automatisk',
-    presentersOnly: 'Kun tale mikrofoner',
-    audienceOnly: 'Kun tak mikrofoner',
-    presentersAndAudience: 'Tale og tak mikrofoner'
+    autoDuck: 'Auto Adjust Audience',
+    presentersOnly: 'Only Presenters',
+    audienceOnly: 'Only Audience',
+    presentersAndAudience: 'Presenters & Audience'
   },
 
   defaultMode: 'autoDuck',
