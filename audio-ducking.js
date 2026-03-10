@@ -15,9 +15,9 @@
  *   - Optional standby stop/restart
  *   - Added audienceOnly mode
  *   - Added configurable VU meter source (BeforeAEC/AfterAEC)
- *   - Optional NoiseRemoval.Mode config
+ *   - added NoiseRemoval.Mode config and helper function
  *   - Consolidated mic control with state caching to reduce repeated writes
- *   - added min, max, avarage, avgMin, avgMax microphone gain information to the log output during debug and finetuning.
+ *   - added min, max, avarage, avgMin, avgMax microphone gain/level information to the log output during debug and finetuning.
  **************************************************************/
 
 import xapi from 'xapi';
@@ -128,7 +128,7 @@ setTimeout(init, 3000);
 async function init() {
   gainLevel = await checkGainLevel();
   applyVuMeterConfig();
-  await applyNoiseRemovalConfig();
+  await applyMicNoiseRemoval();
   await detectTeams();
   await createPanel();
 
@@ -645,7 +645,7 @@ async function detectTeams() {
   }
 }
 
-async function applyNoiseRemovalConfig() {
+async function applyMicNoiseRemoval() {
   const allowedModes = ['Disabled', 'Enabled', 'Manual'];
   const desired = config.noiseRemoval?.mode ?? 'Enabled';
   const modeToApply = allowedModes.includes(desired) ? desired : 'Enabled';
